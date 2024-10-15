@@ -107,9 +107,16 @@ esac
 # 防止resolv.conf被重置
 chattr +i /etc/resolv.conf
 
-# 同步时间
-echo "正在同步时间..."
-timedatectl set-ntp true
+# 安装并启动 systemd-timesyncd 服务以启用时间同步
+echo "正在安装 systemd-timesyncd..."
+apt install -y systemd-timesyncd
+
+# 启用并启动 time-sync 服务
+echo "启用时间同步..."
+systemctl enable systemd-timesyncd
+systemctl start systemd-timesyncd
+
+# 检查时间同步状态
 if timedatectl status | grep "NTP synchronized: yes" > /dev/null; then
   echo "时间同步成功！"
 else
