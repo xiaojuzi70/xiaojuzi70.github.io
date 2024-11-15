@@ -1,9 +1,9 @@
-#!/bin/#!/bin/bash
+#!/bin/bash
 
 # 确保以 root 用户运行
 if [ "$EUID" -ne 0 ]; then
   echo "请以 root 用户运行此脚本。"
-  exit
+  exit 1
 fi
 
 echo "==== 综合服务器配置工具 ===="
@@ -28,18 +28,15 @@ function modify_ssh_config() {
     cp $SSH_CONFIG $BACKUP_CONFIG
   fi
 
-  echo -n "请输入新的 SSH 端口（默认 2222，留空跳过）："
-  read -r new_port
+  # 修改 SSH 端口
+  read -p "请输入新的 SSH 端口（默认 2222，留空跳过）：" new_port
+  new_port=${new_port:-2222}
+  sed -i "s/^#\?Port.*/Port $new_port/" $SSH_CONFIG
+  echo "SSH 端口已修改为 $new_port。"
 
-  if [[ -n $new_port ]]; then
-    sed -i "s/^#\?Port.*/Port $new_port/" $SSH_CONFIG
-    echo "SSH 端口已修改为 $new_port。"
-  else
-    echo "跳过 SSH 端口修改。"
-  fi
-
-  echo -n "是否禁用密码登录？(y/n，默认 n)："
-  read -r disable_password
+  # 禁用密码登录
+  read -p "是否禁用密码登录？(y/n，默认 n)：" disable_password
+  disable_password=${disable_password:-n}
 
   if [[ $disable_password == "y" ]]; then
     sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' $SSH_CONFIG
@@ -55,26 +52,23 @@ function modify_ssh_config() {
 # 功能 2: 配置 Fail2Ban
 function configure_fail2ban() {
   echo "2. 配置 Fail2Ban..."
-  FAIL2BAN_CONFIG="/etc/fail2ban/jail.local"
-
   if ! command -v fail2ban-server &>/dev/null; then
     echo "Fail2Ban 未安装，正在安装..."
-    apt update
-    apt install -y fail2ban
+    apt update && apt install -y fail2ban
   fi
 
-  echo -n "请输入最大尝试次数（默认 3，留空跳过）："
-  read -r maxretry
+  # 输入 Fail2Ban 配置
+  read -p "请输入最大尝试次数（默认 3，留空跳过）：" maxretry
   maxretry=${maxretry:-3}
 
-  echo -n "请输入封禁时间（秒，默认 86400，留空跳过）："
-  read -r bantime
+  read -p "请输入封禁时间（秒，默认 86400，留空跳过）：" bantime
   bantime=${bantime:-86400}
 
-  echo -n "请输入检测时间窗口（秒，默认 600，留空跳过）："
-  read -r findtime
+  read -p "请输入检测时间窗口（秒，默认 600，留空跳过）：" findtime
   findtime=${findtime:-600}
 
+  # 配置 Fail2Ban
+  FAIL2BAN_CONFIG="/etc/fail2ban/jail.local"
   cat > $FAIL2BAN_CONFIG <<EOL
 [sshd]
 enabled = true
@@ -92,8 +86,7 @@ EOL
 # 功能 3: 解封 IP
 function unban_ip() {
   echo "3. 解封指定 IP..."
-  echo -n "请输入要解封的 IP 地址（留空跳过）："
-  read -r ip_address
+  read -p "请输入要解封的 IP 地址：" ip_address
 
   if [[ -n $ip_address ]]; then
     fail2ban-client unban "$ip_address"
@@ -228,7 +221,7 @@ while true; do
     4) update_sources ;;
     5) configure_dns ;;
     6) enable_time_sync ;;
-    7) echo "退出脚本。"; exit ;;
+    7) echo "退出脚本。"; exit 0 ;;
     *) echo "无效选项，请重新输入。" ;;
   esac
 done
